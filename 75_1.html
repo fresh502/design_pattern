@@ -97,11 +97,20 @@ const JsonData = (_ => {
 const Renderer = (_ => {
   const info = Symbol.for('info')
   const render = Symbol.for('render data')
+  const setDataForRendering = Symbol.for('set data for rendering')
+  const dataForRendering = Symbol.for('data for rendering')
   return class {
     async render (data) {
       if (!data instanceof Data) throw new Error('invalid data type')
       this[info] = await data.getData()
+      this[setDataForRendering]()
       this[render]()
+    }
+    [setDataForRendering] () {
+      const title = this[info].getTitle()
+      const header = this[info].getHeader()
+      const items = this[info].getItems()
+      this[dataForRendering] = {title, header, items}
     }
     [render] () {
       throw new Error('must be overrided')
@@ -113,6 +122,7 @@ const TableRenderer = (_ => {
   const parentSelector = Symbol('parent selector')
   const info = Symbol.for('info')
   const render = Symbol.for('render data')
+  const dataForRendering = Symbol.for('data for rendering')
   return class extends Renderer {
     constructor (parent) {
       if (!parent || typeof parent !== 'string') throw new Error('invalid parent selector')
@@ -122,10 +132,7 @@ const TableRenderer = (_ => {
     [render] () {
       const parent = document.querySelector(this[parentSelector])
       if (!parent) throw new Error('invalid parent')
-      const title = this[info].getTitle()
-      const header = this[info].getHeader()
-      const items = this[info].getItems()
-
+      const {title, header, items} = this[dataForRendering]
       const table = document.createElement('table')
       const caption = document.createElement('caption')
       caption.innerHTML = title
