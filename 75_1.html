@@ -7,165 +7,143 @@
 <body>
   <section id="data"></section>
 <script>
-const rawJsonData = {
-  "title":"TIOBE Index for June 2017",
-  "header":["Jun-17","Jun-16","Change","Programming Language","Ratings","Change"],
-  "items":[
-    [1,1,"","Java","14.49%","-6.30%"],
-    [2,2,"","C","6.85%","-5.53%"],
-    [3,3,"","C++","5.72%","-0.48%"],
-    [4,4,"","Python","4.33%","0.43%"],
-    [5,5,"","C#","3.53%","-0.26%"],
-    [6,9,"change","Visual Basic .NET","3.11%","0.76%"],
-    [7,7,"","JavaScript","3.03%","0.44%"],
-    [8,6,"change","PHP","2.77%","-0.45%"],
-    [9,8,"change","Perl","2.31%","-0.09%"],
-    [10,12,"change","Assembly language","2.25%","0.13%"],
-    [11,10,"change","Ruby","2.22%","-0.11%"],
-    [12,14,"change","Swift","2.21%","0.38%"],
-    [13,13,"","Delphi/Object Pascal","2.16%","0.22%"],
-    [14,16,"change","R","2.15%","0.61%"],
-    [15,48,"change","Go","2.04%","1.83%"],
-    [16,11,"change","Visual Basic","2.01%","-0.24%"],
-    [17,17,"","MATLAB","2.00%","0.55%"],
-    [18,15,"change","Objective-C","1.96%","0.25%"],
-    [19,22,"change","Scratch","1.71%","0.76%"],
-    [20,18,"change","PL/SQL","1.57%","0.22%"]
-  ]
-}
-
 const Info = (_ => {
-  const Private = Symbol('private property')
+  const Private = Symbol('private property');
   return class {
     constructor (json) {
-      const {title, header, items} = json
-      if (!title || !typeof title === 'string') throw new Error('invalid title')
-      if (!header || !Array.isArray(header)) throw new Error('invalid header')
+      const {title, header, items} = json;
+      let parsedItems;
+      if (!title || !typeof title === 'string') throw new Error('invalid title');
+      if (!header || !Array.isArray(header)) throw new Error('invalid header');
       for (const data of header) {
-        if (!data || typeof data !== 'string') throw new Error('invalid header data')
+        if (!data || typeof data !== 'string') throw new Error('invalid header data');
       }
-      if (!items || !Array.isArray(items)) throw new Error('invalid items')
+      if (!items || !Array.isArray(items)) throw new Error('invalid items');
       else {
-        for (const item of items) {
-          if (!item || !Array.isArray(item)) throw new Error('invalid item')
-          if (item.length !== header.length) throw new Error(`item length is not equal to header length: ${item}`)
-          for (const data of item) {
-            if (!typeof data === 'string') throw new Errori('invalid data of item')
+        parsedItems = items.map(item => {
+          if (!item || !Array.isArray(item)) throw new Error('invalid item');
+          if (item.length !== header.length) {
+            console.error(`item length is not equal to header length: ${item}`);
+            item = ['invalid data'];
           }
-        }
+          for (const data of item) {
+            if (!typeof data === 'string') throw new Error('invalid data of item');
+          }
+          return item
+        })
       }
-      this[Private] = {title, header, items}
+      this[Private] = {title, header, items: parsedItems};
     }
-    getTitle () { return this[Private].title }
-    getHeader () { return this[Private].header }
-    getItems () { return this[Private].items }
+    getTitle () { return this[Private].title; }
+    getHeader () { return this[Private].header; }
+    getItems () { return this[Private].items; }
   }
-})()
+})();
 
 const Data = (_ => {
-  const dataSource = Symbol.for('data source')
-  const getData = Symbol.for('get data')
+  const dataSource = Symbol.for('data source');
+  const getData = Symbol.for('get data');
   return class {
     async getData () {
-      const json = await this[getData]()
-      return new Info(json)
+      const json = await this[getData]();
+      return new Info(json);
     }
     async [getData] () {
-      throw new Error('must be overrided')
+      throw new Error('must be overrided');
     }
   }
-})()
+})();
 const JsonData = (_ => {
-  const dataSource = Symbol.for('data source')
-  const getData = Symbol.for('get data')
+  const dataSource = Symbol.for('data source');
+  const getData = Symbol.for('get data');
   return class extends Data {
     constructor (data) {
-      super()
-      this[dataSource] = data
+      super();
+      this[dataSource] = data;
     }
     async [getData] () {
-      let json
-      if (this[dataSource] === 'string') {
-        const response = await fetch(this[dataSource])
-        json = await response.json()
-      } else json = this[dataSource]
-      return json
+      let json;
+      if (typeof this[dataSource] === 'string') {
+        const response = await fetch(this[dataSource]);
+        json = await response.json();
+      } else json = this[dataSource];
+      return json;
     }
   }
-})()
+})();
 
 const Renderer = (_ => {
-  const info = Symbol.for('info')
-  const render = Symbol.for('render data')
-  const setDataForRendering = Symbol.for('set data for rendering')
-  const dataForRendering = Symbol.for('data for rendering')
+  const info = Symbol.for('info');
+  const render = Symbol.for('render data');
+  const setDataForRendering = Symbol.for('set data for rendering');
+  const dataForRendering = Symbol.for('data for rendering');
   return class {
     async render (data) {
-      if (!data instanceof Data) throw new Error('invalid data type')
-      this[info] = await data.getData()
-      this[setDataForRendering]()
-      this[render]()
+      if (!data instanceof Data) throw new Error('invalid data type');
+      this[info] = await data.getData();
+      this[setDataForRendering]();
+      this[render]();
     }
     [setDataForRendering] () {
-      const title = this[info].getTitle()
-      const header = this[info].getHeader()
-      const items = this[info].getItems()
-      this[dataForRendering] = {title, header, items}
+      const title = this[info].getTitle();
+      const header = this[info].getHeader();
+      const items = this[info].getItems();
+      this[dataForRendering] = {title, header, items};
     }
     [render] () {
-      throw new Error('must be overrided')
+      throw new Error('must be overrided');
     }
   }
-})()
+})();
 
 const TableRenderer = (_ => {
-  const parentSelector = Symbol('parent selector')
-  const info = Symbol.for('info')
-  const render = Symbol.for('render data')
-  const dataForRendering = Symbol.for('data for rendering')
+  const parentSelector = Symbol('parent selector');
+  const info = Symbol.for('info');
+  const render = Symbol.for('render data');
+  const dataForRendering = Symbol.for('data for rendering');
   return class extends Renderer {
     constructor (parent) {
-      if (!parent || typeof parent !== 'string') throw new Error('invalid parent selector')
-      super()
-      this[parentSelector] = parent
+      if (!parent || typeof parent !== 'string') throw new Error('invalid parent selector');
+      super();
+      this[parentSelector] = parent;
     }
     [render] () {
-      const parent = document.querySelector(this[parentSelector])
-      if (!parent) throw new Error('invalid parent')
-      const {title, header, items} = this[dataForRendering]
-      const table = document.createElement('table')
-      const caption = document.createElement('caption')
-      caption.innerHTML = title
-      table.appendChild(caption)
+      const parent = document.querySelector(this[parentSelector]);
+      if (!parent) throw new Error('invalid parent');
+      const {title, header, items} = this[dataForRendering];
+      const table = document.createElement('table');
+      const caption = document.createElement('caption');
+      caption.innerHTML = title;
+      table.appendChild(caption);
       table.appendChild(
         header.reduce((thead, data) => {
-          const th = document.createElement('th')
-          th.innerHTML = data
-          thead.appendChild(th)
-          return thead
+          const th = document.createElement('th');
+          th.innerHTML = data;
+          thead.appendChild(th);
+          return thead;
         }, document.createElement('thead'))
-      )
+      );
       table.appendChild(
         items.reduce((tbody, item) => {
           const tr = item.reduce((tr, data) => {
-            const td = document.createElement('td')
-            td.innerHTML = data
-            tr.appendChild(td)
-            return tr
+            const td = document.createElement('td');
+            td.innerHTML = data;
+            tr.appendChild(td);
+            return tr;
           }, document.createElement('tr'))
-          tbody.appendChild(tr)
-          return tbody
+          tbody.appendChild(tr);
+          return tbody;
         }, document.createElement('tbody'))
-      )
+      );
 
-      parent.appendChild(table)
+      parent.appendChild(table);
     }
   }
-})()
+})();
 
-const data = new JsonData(rawJsonData)
-const renderer = new TableRenderer('#data')
-renderer.render(data)
+const data = new JsonData('https://gist.githubusercontent.com/hikaMaeng/717dc66225e40a8fe8d1c40366d40957/raw/447d44b800ed98817b0d29681be90aa1ec36e4ac/71_1.json');
+const renderer = new TableRenderer('#data');
+renderer.render(data);
 </script>
 </body>
 </html>
