@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>CodeSpitz75-1</title>
+</head>
+<body>
+  <section id="data"></section>
+<script>
+const Info = (_ => {
+  const Private = Symbol('private property');
+  return class {
+    constructor (json) {
+      const {title, header, items} = json;
+      let parsedItems;
+      if (!title || !typeof title === 'string') throw new Error('invalid title');
+      if (!header || !Array.isArray(header)) throw new Error('invalid header');
+      for (const data of header) {
+        if (!data || typeof data !== 'string') throw new Error('invalid header data');
+      }
+      if (!items || !Array.isArray(items)) throw new Error('invalid items');
+      else {
+        parsedItems = items.map(item => {
+          if (!item || !Array.isArray(item)) throw new Error('invalid item');
+          if (item.length !== header.length) {
+            console.error(`item length is not equal to header length: ${item}`);
+            item = ['invalid data'];
+          }
+          for (const data of item) {
+            if (!typeof data === 'string') throw new Error('invalid data of item');
+          }
+          return item
+        })
+      }
+      this[Private] = {title, header, items: parsedItems};
+    }
+    get title () { return this[Private].title; }
+    get header () { return this[Private].header; }
+    get items () { return this[Private].items; }
+  }
+})();
+
+const Data = class {
+  constructor (strategyFunction) {
+    this.strategyFunction = strategyFunction
+  }
+  set strategryFunction (strategyFunction) {
+    this.strategyFunction = strategyFunction
+  }
+  async getData (source) {
+    const json = await this.strategyFunction(source)  
+    return new Info(json)
+  }
+}
+
+const getJsonData = async (source) => {
+  let json
+  if (typeof source === 'string') {
+    const res = await fetch(source)
+    json = await res.json()
+  } else json = source
+  return json
+}
+
+const Renderer = (_ => {
+  return class {
+    constructor (strategyFn) {
+      this.strategyFn = strategyFn
+    }
+    set strategyFuntion (strategyFn) {
+      this.strategyFn = strategyFn
+    }
+    render (parent, info) {
+      if (!parent || typeof parent !== 'string') throw new Error('invalid parent')
+      if (!info instanceof Info) throw new Error('invalid info');
+      const {title, header, items} = info
+      this.strategyFn(parent, {title, header, items})
+    }
+  }
+})();
+
+const renderTable = (parentSelector, {title, header, items}) => {
+  const parent = document.querySelector(parentSelector);
+  if (!parent) throw new Error('invalid parent');
+
+  const table = document.createElement('table');
+  const caption = document.createElement('caption');
+  caption.innerHTML = title;
+  table.appendChild(caption);
+  table.appendChild(
+    header.reduce((thead, data) => {
+      const th = document.createElement('th');
+      th.innerHTML = data;
+      thead.appendChild(th);
+      return thead;
+    }, document.createElement('thead'))
+  );
+  table.appendChild(
+    items.reduce((tbody, item) => {
+      const tr = item.reduce((tr, data) => {
+        const td = document.createElement('td');
+        td.innerHTML = data;
+        tr.appendChild(td);
+        return tr;
+      }, document.createElement('tr'))
+      tbody.appendChild(tr);
+      return tbody;
+    }, document.createElement('tbody'))
+  );
+
+  parent.appendChild(table);
+}
+
+(async () => {
+  const data = new Data(getJsonData)
+  const info = await data.getData('https://gist.githubusercontent.com/hikaMaeng/717dc66225e40a8fe8d1c40366d40957/raw/447d44b800ed98817b0d29681be90aa1ec36e4ac/71_1.json')
+  const renderer = new Renderer(renderTable);
+  renderer.render('#data', info);
+})()
+</script>
+</body>
+</html>
