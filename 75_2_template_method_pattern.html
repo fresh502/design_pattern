@@ -10,7 +10,7 @@
 <script>
 const Github = class {
   constructor (id, repo) {
-    this._base = `https://api.github.com/repos/${id}/${repo}/contents`;
+    this._base = `https://api.github.com/repos/${id}/${repo}/contents/`;
   }
   load (path) {
     const id = `callback${Github._id++}`;
