@@ -11,7 +11,6 @@
 const Github = class {
   constructor (id, repo) {
     this._base = `https://api.github.com/repos/${id}/${repo}/contents`;
-    console.log(this._base)
   }
   load (path) {
     const id = `callback${Github._id++}`;

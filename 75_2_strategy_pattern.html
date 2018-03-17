@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>CodeSpitz75-2</title>
+</head>
+<body>
+  <img id="a"/>
+  <div id="b"></div>
+<script>
+const el = v => document.querySelector(v)
+const d64 = v => decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+const parseMD = v => {
+  return d64(v)
+    .split('\n')
+    .map(v => {
+      for (let i = 3; i > 0; i--) {
+        if(v.startsWith('#'.repeat(i))) return `<h${i}>${v.substr(i)}</h${i}>`;
+      }
+      if (v.startsWith('*')) return `<li>${v.substr(1)}</li>`
+      return v
+    })
+    .join('<br>')
+}
+
+const Github = class {
+  constructor (id, repo) {
+    this._base = `https://api.github.com/repos/${id}/${repo}/contents`;
+  }
+  set parser (v) { this._parser = v; }
+  load (path) {
+    const id = `callback${Github._id++}`;
+    Github[id] = ({data: {content}}) => {
+      delete Github[id];
+      document.head.removeChild(s);
+      this._parser(content);
+    }
+    const s = document.createElement('script');
+    s.src = `${this._base}${path}?callback=Github.${id}`;
+    document.head.appendChild(s);
+  }
+}
+Github._id = 0
+
+const img = v => el('#a').src = `data:text/plain;base64,${v}`;
+
+const md = v => el('#b').innerHTML = parseMD(v);
+
+const loader = new Github('hikaMaeng', 'codespitz75')
+loader.parser = img
+loader.load('einBig.png')
+loader.parser = md
+loader.load('README.md')
+</script>
+</body>
+</html>
