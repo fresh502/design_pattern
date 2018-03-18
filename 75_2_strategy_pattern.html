@@ -41,21 +41,39 @@ const Github = class {
     return new Promise((resolve, reject) => {
       s.src = `${this._base}${path}?callback=Github.${id}`;
       document.head.appendChild(s);
-      s.onload = () => resolve()
-      s.onerror = () => reject()
+      s.onload = () => resolve();
+      s.onerror = () => reject();
     });
   }
 }
 Github._id = 0
 
+const Loader = class {
+  constructor (id, repo) {
+    this._git = new Github(id, repo);
+    this._router = new Map;
+  }
+  add (ext, f, ...args) {
+    ext.split(',').forEach(v => this._router.set(v, [f, args]));
+  }
+  async load (v) {
+    const {_router: router, _git: git} = this;
+    const ext = v.split('.').pop();
+    if (!router.has(ext)) throw new Error('Not supported extension');
+    const [f, args] = router.get(ext);
+    git.setParser(f, ...args);
+    await git.load(v);
+  }
+}
+
 const img = (v, el) => el.src = `data:text/plain;base64,${v}`;
 const md = (v, el) => el.innerHTML = parseMD(v);
 
 (async () => {
-  const loader = new Github('hikaMaeng', 'codespitz75');
-  loader.setParser(img, el('#a'));
+  const loader = new Loader('hikaMaeng', 'codespitz75');
+  loader.add('jpg,png,gif', img, el('#a'));
+  loader.add('md', md, el('#b'));
   await loader.load('einBig.png');
-  loader.setParser(md, el('#b'));
   await loader.load('README.md');
 })();
 </script>
