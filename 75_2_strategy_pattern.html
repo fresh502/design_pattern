@@ -8,35 +8,28 @@
   <img id="a"/>
   <div id="b"></div>
 <script>
-const el = v => document.querySelector(v)
-const d64 = v => decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-const parseMD = v => {
-  return d64(v)
-    .split('\n')
-    .map(v => {
-      for (let i = 3; i > 0; i--) {
-        if(v.startsWith('#'.repeat(i))) return `<h${i}>${v.substr(i)}</h${i}>`;
-      }
-      return v
-    })
-    .join('<br>')
-}
-
 const Github = class {
   constructor (id, repo) {
     this._base = `https://api.github.com/repos/${id}/${repo}/contents/`;
+    this._router = new Map;
   }
-  setParser (f, ...args) {
-    this._parser = [f, args];
+  set parser(o) {
+    if (!o instanceof Loader) throw new Error('Invalid loader');
+    this._parser = o;
+    const {ext} = this._parser;
+    ext.split(',').forEach(v => this._router.set(v, o));
   }
   load (path) {
+    const router = this._router;
     const id = `callback${Github._id++}`;
     const s = document.createElement('script');
     Github[id] = ({data: {content}}) => {
       delete Github[id];
       document.head.removeChild(s);
-      const el = this._parser[1][0];
-      this._parser[0](content, el);
+      const ext = path.split('.').pop();
+      if (!router.has(ext)) throw new Error('Not supprted extention');
+      const parser = router.get(ext);
+      parser.load(content);
     }
     return new Promise((resolve, reject) => {
       s.src = `${this._base}${path}?callback=Github.${id}`;
@@ -49,33 +42,59 @@ const Github = class {
 Github._id = 0
 
 const Loader = class {
-  constructor (id, repo) {
-    this._git = new Github(id, repo);
-    this._router = new Map;
+  constructor (target) {
+    if (new.target === Loader) throw new Error('This class cannot be intantiated directly');
+    this._el = document.querySelector(target);
   }
-  add (ext, f, ...args) {
-    ext.split(',').forEach(v => this._router.set(v, [f, args]));
+  load () { throw new Error('Must be overrided'); }
+}
+
+const ImageLoader = class extends Loader {
+  constructor (target) {
+    super(target);
+    this._ext = 'png,gif,jpg,jpeg';
   }
-  async load (v) {
-    const {_router: router, _git: git} = this;
-    const ext = v.split('.').pop();
-    if (!router.has(ext)) throw new Error('Not supported extension');
-    const [f, args] = router.get(ext);
-    git.setParser(f, ...args);
-    await git.load(v);
+  get ext() { return this._ext; }
+  get el() { return this._el; }
+  load (content) {
+    this._el.src = `data:text/plain;base64,${content}`;
   }
 }
 
-const img = (v, el) => el.src = `data:text/plain;base64,${v}`;
-const md = (v, el) => el.innerHTML = parseMD(v);
+const MDLoader = class extends Loader {
+  constructor (target) {
+    super(target);
+    this._ext = 'md';
+  }
+  get ext() { return this._ext; }
+  get el() { return this._el; }
+  load (content) {
+    const d64 = v => {
+      return decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+    }
+    const parseMD = v => {
+      return d64(v)
+        .split('\n')
+        .map(v => {
+          for (let i = 3; i > 0; i--) {
+            if(v.startsWith('#'.repeat(i))) return `<h${i}>${v.substr(i)}</h${i}>`;
+          }
+          return v
+        })
+        .join('<br>')
+      }
+    this._el.innerHTML = parseMD(content);
+  }
+}
 
-(async () => {
-  const loader = new Loader('hikaMaeng', 'codespitz75');
-  loader.add('jpg,png,gif', img, el('#a'));
-  loader.add('md', md, el('#b'));
-  await loader.load('einBig.png');
-  await loader.load('README.md');
-})();
+const loader = new Github('hikaMaeng', 'codespitz75');
+const img = new ImageLoader('#a');
+loader.parser = img;
+loader.load('einBig.png');
+
+const md = new MDLoader('#b');
+loader.parser = md;
+loader.load('README.md');
 </script>
 </body>
 </html>
