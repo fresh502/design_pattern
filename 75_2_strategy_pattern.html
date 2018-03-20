@@ -16,23 +16,24 @@ const Github = class {
     this._repoMap = new Map;
   }
   addRepo (key, id, repo) {
-    if (typeof key !== 'string' || typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument of addRepo');
+    if (typeof key !== 'string' || typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument');
     const router = new Map;
-    // symbol for base?
-    router.set('base', `https://api.github.com/repos/${id}/${repo}/contents/`);
+    router.base = `https://api.github.com/repos/${id}/${repo}/contents/`;
     this._repoMap.set(key, router)
   }
   addRouter (key, ext, o) {
-    if (!o instanceof Loader) throw new Error('Invalid loader');
-    const router = this._repoMap.get(key);
-    if (!router) throw new Error('Not added repo');
+    if (!this._repoMap.has(key)) throw new Error('Not added repo');
     if (typeof ext !== 'string') throw new Error('Invalid ext');
+    if (!o instanceof Loader) throw new Error('Invalid loader');
+
+    const router = this._repoMap.get(key);
     ext.split(',').forEach(v => router.set(v, o));
   }
   load (key, path, el) {
+    if (!this._repoMap.has(key)) throw new Error('Not supported repo');
+    if (typeof path !== 'string') throw new Error('Invalid path');
     const router = this._repoMap.get(key);
-    const base = router.get('base');
-    if (!router) throw new Error('Not supported repo');
+    const {base} = router
      
     const id = `callback${Github._id++}`;
     const s = document.createElement('script');
