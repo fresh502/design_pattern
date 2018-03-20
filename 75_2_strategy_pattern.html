@@ -7,71 +7,63 @@
 <body>
   <img id="a"/>
   <div id="b"></div>
+  <img id="c"/>
+  <div id="d"></div>
 <script>
+const el = v => document.querySelector(v);
 const Github = class {
-  constructor (id, repo) {
-    this._base = `https://api.github.com/repos/${id}/${repo}/contents/`;
-    this._router = new Map;
+  constructor () {
+    this._repoMap = new Map;
   }
-  set parser(o) {
+  addRepo (key, id, repo) {
+    if (typeof key !== 'string' || typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument of addRepo');
+    const router = new Map;
+    // symbol for base?
+    router.set('base', `https://api.github.com/repos/${id}/${repo}/contents/`);
+    this._repoMap.set(key, router)
+  }
+  addRouter (key, ext, o) {
     if (!o instanceof Loader) throw new Error('Invalid loader');
-    this._parser = o;
-    const {ext} = this._parser;
-    ext.split(',').forEach(v => this._router.set(v, o));
+    const router = this._repoMap.get(key);
+    if (!router) throw new Error('Not added repo');
+    if (typeof ext !== 'string') throw new Error('Invalid ext');
+    ext.split(',').forEach(v => router.set(v, o));
   }
-  load (path) {
-    const router = this._router;
+  load (key, path, el) {
+    const router = this._repoMap.get(key);
+    const base = router.get('base');
+    if (!router) throw new Error('Not supported repo');
+     
     const id = `callback${Github._id++}`;
     const s = document.createElement('script');
+    s.src = `${base}${path}?callback=Github.${id}`;
+    document.head.appendChild(s);
+
     Github[id] = ({data: {content}}) => {
       delete Github[id];
       document.head.removeChild(s);
       const ext = path.split('.').pop();
-      if (!router.has(ext)) throw new Error('Not supprted extention');
       const parser = router.get(ext);
-      parser.load(content);
+      if (!parser) throw new Error('Not supported extention');
+      parser.load(el, content);
     }
-    return new Promise((resolve, reject) => {
-      s.src = `${this._base}${path}?callback=Github.${id}`;
-      document.head.appendChild(s);
-      s.onload = () => resolve();
-      s.onerror = () => reject();
-    });
   }
 }
 Github._id = 0
 
 const Loader = class {
-  constructor (target) {
-    if (new.target === Loader) throw new Error('This class cannot be intantiated directly');
-    this._el = document.querySelector(target);
-  }
-  load () { throw new Error('Must be overrided'); }
+  load (el, content) { throw new Error('Must be overrided'); }
 }
 
 const ImageLoader = class extends Loader {
-  constructor (target) {
-    super(target);
-    this._ext = 'png,gif,jpg,jpeg';
-  }
-  get ext() { return this._ext; }
-  get el() { return this._el; }
-  load (content) {
-    this._el.src = `data:text/plain;base64,${content}`;
+  load (el, content) {
+    el.src = `data:text/plain;base64,${content}`;
   }
 }
 
 const MDLoader = class extends Loader {
-  constructor (target) {
-    super(target);
-    this._ext = 'md';
-  }
-  get ext() { return this._ext; }
-  get el() { return this._el; }
-  load (content) {
-    const d64 = v => {
-      return decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-    }
+  load (el, content) {
+    const d64 = v => decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     const parseMD = v => {
       return d64(v)
         .split('\n')
@@ -81,20 +73,28 @@ const MDLoader = class extends Loader {
           }
           return v
         })
-        .join('<br>')
+        .join('<br>');
       }
-    this._el.innerHTML = parseMD(content);
+    el.innerHTML = parseMD(content);
   }
 }
 
-const loader = new Github('hikaMaeng', 'codespitz75');
-const img = new ImageLoader('#a');
-loader.parser = img;
-loader.load('einBig.png');
+const github = new Github();
+const img = new ImageLoader();
+const md = new MDLoader();
 
-const md = new MDLoader('#b');
-loader.parser = md;
-loader.load('README.md');
+github.addRepo('sinrok', 'fresh502', 'design_pattern')
+github.addRouter('sinrok', 'jpg,png,gif', img);
+github.addRouter('sinrok', 'md', md)
+
+github.addRepo('s75', 'hikaMaeng', 'codespitz75');
+github.addRouter('s75', 'jpg,png,gif', img);
+github.addRouter('s75', 'md', md);
+
+github.load('sinrok', 'husky.png', el('#a'));
+github.load('sinrok', 'README.md', el('#b'));
+github.load('s75', 'einBig.png', el('#c'));
+github.load('s75', 'README.md', el('#d'));
 </script>
 </body>
 </html>
