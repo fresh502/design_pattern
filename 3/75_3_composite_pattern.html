@@ -1,0 +1,68 @@
+<html>
+<head>
+</head>
+<body>
+</body>
+<script>
+const taskSortRouter = {
+  title: (taskA, taskB) => taskA.sortTitle(taskB),
+  date: (taskA, taskB) => taskB.sortDate(taskB),
+  registger: (taskA, taskB) => null
+}
+const Task = class {
+  constructor (title) {
+    if (!title || typeof title !== 'string') throw new Error('Invalid title')
+    this._title = title
+    this._date = Date.now()
+    this._isCompleted = false
+  }
+  toggle () {
+    this._isCompleted = !this._isCompleted
+  }
+  sortTitle (task) {
+    return this._title > task._title
+  }
+  sortDate (task) {
+    return this._date > task._date
+  }
+}
+const TaskList = class {
+  constructor (title) {
+    if (!title || typeof title !== 'string') throw new Error('Invalid title')
+    this._title = title
+    this._list = []
+  }
+  add (title) {
+    this._list.push(new Task(title)) 
+  }
+  reomve (title) {
+    const l = this._list
+    const index = l.findIndex(task => title === task.title)
+    l.splice(index, 1)
+  }
+  _getList (sort, stateGroup) {
+    const s = taskSortRouter[sort]
+    const list = [...this._list]
+    const ret = stateGroup ? [list.filter(task => !task.isCompleted).sort(s), list.filter(task => task.isCompleted).sort(s)]
+      .reduce((p, c) => p.concat(c.sort()), []) : list.sort(s)      
+    return ret
+  }
+  byTitle (stateGroup = true) {
+    return this._getList('title', stateGroup)    
+  }
+  byDate (stateGroup = true) {
+    return this._getList('date', stateGroup)    
+  }
+  byRegister (stateGroup = true) {
+    return this._getList('register', stateGroup)
+  }
+}
+const taskList = new TaskList('my task list')
+taskList.add('task1')
+taskList.add('task3')
+taskList.add('task2')
+console.log(taskList.byTitle())
+console.log(taskList.byDate())
+console.log(taskList.byRegister())
+</script>
+</html>
