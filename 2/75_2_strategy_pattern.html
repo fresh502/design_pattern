@@ -11,9 +11,15 @@
   <div id="d"></div>
 <script>
 const el = v => document.querySelector(v);
-const Github = class {
+const baseUrl = Symbol.for('baseUrl of router');
+const Service = class {
   constructor () {
     this._repoMap = new Map;
+  }
+}
+const GithubService = class extends Service {
+  constructor () {
+    super();
   }
   addRepo (key, id, repo) {
     if (typeof key !== 'string' || typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument');
@@ -35,13 +41,13 @@ const Github = class {
     const router = this._repoMap.get(key);
     const {base} = router
      
-    const id = `callback${Github._id++}`;
+    const id = `callback${GithubService._id++}`;
     const s = document.createElement('script');
-    s.src = `${base}${path}?callback=Github.${id}`;
+    s.src = `${base}${path}?callback=GithubService.${id}`;
     document.head.appendChild(s);
 
-    Github[id] = ({data: {content}}) => {
-      delete Github[id];
+    GithubService[id] = ({data: {content}}) => {
+      delete GithubService[id];
       document.head.removeChild(s);
       const ext = path.split('.').pop();
       const parser = router.get(ext);
@@ -50,7 +56,7 @@ const Github = class {
     }
   }
 }
-Github._id = 0
+GithubService._id = 0
 
 const Loader = class {
   load (el, content) { throw new Error('Must be overrided'); }
@@ -61,7 +67,6 @@ const ImageLoader = class extends Loader {
     el.src = `data:text/plain;base64,${content}`;
   }
 }
-
 const MDLoader = class extends Loader {
   load (el, content) {
     const d64 = v => decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
@@ -80,22 +85,38 @@ const MDLoader = class extends Loader {
   }
 }
 
-const github = new Github();
-const img = new ImageLoader();
-const md = new MDLoader();
+const Builder = class {
+  constructor () {
+    
+  }
+  getService () {
+    throw new Error('Must be overrided');
+  }
+}
+const GithubServiceBuilder = class extends Builder {
+  constructor (key, id, repo) {
+    super();
+    const strategyForExt = [
+      {'jpg,png,gif': new ImageLoader},
+      {'md': new MDLoader}
+    ]
+    const githubService = new GithubService();
+    githubService.addRepo(key, id, repo);
+    strategyForExt.forEach(obj => Object.entries(obj).forEach(([ext, strategy]) => githubService.addRouter(key, ext, strategy)));
+    this._githubService = githubService;
+  }
+  getService () {
+    return this._githubService;
+  }
+}
 
-github.addRepo('sinrok', 'fresh502', 'design_pattern')
-github.addRouter('sinrok', 'jpg,png,gif', img);
-github.addRouter('sinrok', 'md', md)
-
-github.addRepo('s75', 'hikaMaeng', 'codespitz75');
-github.addRouter('s75', 'jpg,png,gif', img);
-github.addRouter('s75', 'md', md);
+const githubServiceBuilder = new GithubServiceBuilder('sinrok', 'fresh502', 'design_pattern');
+const github = githubServiceBuilder.getService();
 
 github.load('sinrok', 'husky.png', el('#a'));
 github.load('sinrok', 'README.md', el('#b'));
-github.load('s75', 'einBig.png', el('#c'));
-github.load('s75', 'README.md', el('#d'));
+// github.load('s75', 'einBig.png', el('#c'));
+// github.load('s75', 'README.md', el('#d'));
 </script>
 </body>
 </html>
