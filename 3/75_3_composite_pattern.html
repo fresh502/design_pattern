@@ -4,86 +4,100 @@
 <body>
 </body>
 <script>
-const taskSortRouter = {
-  title: (taskA, taskB) => taskA.sortTitle(taskB),
-  date: (taskA, taskB) => taskB.sortDate(taskB),
-  registger: (taskA, taskB) => null
-}
-const Task = class Task {
-  constructor (title) {
-    if (new.target === 'Task') throw new Error('This class cannot be instantiated directly')
-    if (!title || typeof title !== 'string') throw new Error('Invalid title')
-    this._title = title
-    this._list = []
+const TaskItem = class {
+  constructor (title, date) {
+    if (!title || typeof title !== 'string') throw new Error('Invalid title');
+    this._title = title;
+    this._date = date;
+    this._isComplted = false;
+    this._list = [];
   }
-  add (task) {
-    this._list.push(task)
+  add (title, date = new Date()) {
+    this._list.push(new TaskItem(title, date))
   }
-  reomve (task) {
-    const l = this._list
-    if (l.includes(task)) l.splice(l.indexOf(task), 1)
-  }
-  getResult (sort, stateGroup) {
-    const s = taskSortRouter[sort]
-    const list = this._list
-    const children = stateGroup ? [list.filter(task => !task.isCompleted).sort(s), list.filter(task => task.isCompleted).sort(s)]
-      .reduce((p, c) => p.concat(c.sort()), []) : [...list].sort(s)
-    return {
-      item: this._getResult(),
-      children: children.map(v => v.getResult(sort, stateGroup))
-    }
+  remove (taskItem) {
+    if (!taskItem instanceof TaskItem) throw new Error('Invalid taskItem');
+    const list = this._list;
+    if (list.includes(taskItem)) list.splice(list.indexOf(taskItem), 1);
   }
   _getList (sort, stateGroup) {
-    throw new Error('Must be overrided')
-  }
-}
-const TaskList = class extends Task {
-  constructor (title) {
-    super(title)
-  }
-  _getResult () {
-    return this._title
-  }
-  byTitle (stateGroup = true) {
-    return this.getResult('title', stateGroup)
-  }
-  byDate (stateGroup = true) {
-    return this.getResult('date', stateGroup)
-  }
-  byRegister (stateGroup = true) {
-    return this.getResult('register', stateGroup)
-  }
-}
-const TaskItem = class extends Task {
-  constructor (title) {
-    super(title)
-    this._date = Date.now()
-    this._isCompleted = false
-  }
-  _getResult () {
-    return this
+    const list = this._list;
+    const s = taskSortRouter[sort];
+    return {
+      task: this,
+      sub: stateGroup ? 
+        [
+          ...list.filter(task => !task.isCompleted).sort(s),
+          ...list.filter(task => task.isCompleted).sort(s)
+        ] : [...list].sort(s)
+    }
   }
   toggle () {
-    this._isCompleted = !this._isCompleted
+    this._isComplted = !this._isCompleted;
   }
-  sortTitle (task) {
-    return this._title > task._title
+  sortTitle (taskItem) {
+    return this._title - taskItem.title;
   }
-  sortDate (task) {
-    return this._date > task._date
+  sortDate (taskItem) {
+    return this._date - taskItem.date;
+  }
+  get title () {
+    return this._title;
+  }
+  get date () {
+    return this._date;
+  }
+  get isCompleted () {
+    return this._isCompleted;
   }
 }
-const taskList = new TaskList('my task list')
-// task에 subTask를 추가할 수 있어야 하므로 taskList에만 add를 구현하는 것은 적절치 않다고 판단.
-const task1 = new TaskItem('task1')
-taskList.add(task1)
-taskList.add(new TaskItem('task3'))
-taskList.add(new TaskItem('task2'))
-task1.add(new TaskItem('sub task1'))
-task1.add(new TaskItem('sub task3'))
-task1.add(new TaskItem('sub task2'))
-console.log(taskList.byTitle())
-// console.log(taskList.byDate())
-// console.log(taskList.byRegister())
+const taskSortRouter = {
+  title: (taskItemA, taskItemB) => taskItemA.sortTitle(taskItemB),
+  date: (taskItemA, taskItemB) => taskItemA.sortDate(taskItemB)
+}
+const TaskList = class {
+  constructor (title) {
+    if (!title || typeof title !== 'string') throw new Error('Invalid title')
+    this._title = title;
+    this._list = [];
+  }
+  add (title, date = new Date()) {
+    this._list.push(new TaskItem(title, date))
+  }
+  remove (taskItem) {
+    if (!taskItem instanceof TaskItem) throw new Error('Invalid taskItem');
+    const list = this._list;
+    if (list.includes(taskItem)) list.splice(list.indexOf(taskItem), 1);
+  }
+  byTitle (stateGroup = true) {
+    return this._getList('title', stateGroup);
+  }
+  byDate(stateGroup = true) {
+    return this._getList('date', stateGroup);
+  }
+  _getList (sort, stateGroup) {
+    const list = this._list;
+    const s = taskSortRouter[sort];
+    const result = stateGroup ? 
+    [
+      ...list.filter(task => !task.isCompleted).sort(s),
+      ...list.filter(task => task.isCompleted).sort(s)
+    ] : [...list].sort(s);
+    return result.map(v => v._getList(sort, stateGroup));
+  }
+}
+const list1 = new TaskList('Codespitz todo');
+list1.add('3강 복습');
+list1.add('3강 과제 제출');
+
+const list2 = new TaskList('Design pattern todo');
+list2.add('read composite pattern');
+list2.add('write composite pattern');
+
+const list  = list2.byDate();
+list[1].task.add('write task interface');
+list[1].task.add('write renderer');
+
+console.log(list2.byDate());
 </script>
 </html>

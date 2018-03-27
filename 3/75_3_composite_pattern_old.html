@@ -1,0 +1,185 @@
+<html>
+<head>
+</head>
+<body>
+  <div id="a"></div>
+</body>
+<script>
+const taskSortRouter = {
+  title: (taskA, taskB) => taskA.sortTitle(taskB),
+  date: (taskA, taskB) => taskB.sortDate(taskB),
+  registger: (taskA, taskB) => null
+}
+const Task = class Task {
+  constructor (title) {
+    if (new.target === 'Task') throw new Error('This class cannot be instantiated directly')
+    this._list = []
+  }
+  add (task) {
+    if (!task instanceof Task) throw new Error('Invalid task')
+    this._list.push(task)
+  }
+  reomve (task) {
+    const l = this._list
+    if (l.includes(task)) l.splice(l.indexOf(task), 1)
+  }
+  getResult (sort, stateGroup) {
+    const s = taskSortRouter[sort]
+    const list = this._list
+    const children = stateGroup ? [list.filter(task => !task.isCompleted).sort(s), list.filter(task => task.isCompleted).sort(s)]
+      .reduce((p, c) => p.concat(c.sort()), []) : [...list].sort(s)
+    return {
+      item: this._getResult(),
+      children: children.map(v => v.getResult(sort, stateGroup))
+    }
+  }
+  _getList (sort, stateGroup) {
+    throw new Error('Must be overrided')
+  }
+}
+const TaskItem = class extends Task {
+  // static title (a, b) {
+  //   return a.sortTitle(b)
+  // }
+  // static date (a, b) {
+  //   return a.sortDate(b)
+  // }
+  // static register (a, b) {
+  //   return null
+  // }
+  constructor (title, date = new Date()) {
+    if (!title || typeof title !== 'string') throw new Error('Invalid title')
+    super()
+    this._title = title
+    this._date = date
+    this._isCompleted = false
+  }
+  get title () {
+    return this._title
+  }
+  get date () {
+    return this._date.toISOString()
+  }
+  get isCompleted () {
+    return this._isCompleted
+  }
+  _getResult () {
+    return this
+  }
+  toggle () {
+    this._isCompleted = !this._isCompleted
+  }
+  sortTitle (task) {
+    return this._title > task._title
+  }
+  sortDate (task) {
+    return this._date > task._date
+  }
+}
+const TaskList = class extends Task {
+  constructor (title) {
+    if (!title || typeof title !== 'string') throw new Error('Invalid title')
+    super()
+    this._title = title
+  }
+  add (title, date) {
+    super.add(new TaskItem(title, date))
+  }
+  _getResult () {
+    return this._title
+  }
+  byTitle (stateGroup = true) {
+    return this.getResult('title', stateGroup)
+  }
+  byDate (stateGroup = true) {
+    return this.getResult('date', stateGroup)
+  }
+  byRegister (stateGroup = true) {
+    return this.getResult('register', stateGroup)
+  }
+}
+
+const DomRenderer = class {
+  static el(type, ...attr) {
+    const el = document.createElement(type) 
+    for (let i = 0; i < attr.length;) {
+      const k = attr[i++], v = attr[i++]
+      if (typeof el[k] === 'function') el[k].apply(el, Array.isArray(v) ? v : [v])
+      else if (k[0] === '@') el.style[k.substr(1)] = v
+      else el[k] = v
+    }
+    return el
+  }
+  constructor (taskList, parentSelector) {
+    this._parent = parentSelector
+    this._taskList = taskList
+    this._sort = 'byRegister'
+  }
+  add (title) {
+    this._taskList.add(title)
+    this.render()
+  }
+  remove (task) {
+    this.taskList.remove(task)
+    this.render()
+  }
+  addSubTask (task, title) {
+    task.add(new TaskItem(title))    
+    this.render()
+  }
+  removeSubTask (task, subTask) {
+    taks.remove(subTask)
+    this.render()
+  }
+  toggle (task) {
+    task.toggle()
+    this.render()
+  }
+  render () {
+    const parent = document.querySelector(this._parent)
+    if (!parent) throw new Error('Invalid parent')
+    parent.innerHTML = ''
+    
+    const data = this._taskList[this._sort]();
+    [
+      DomRenderer.el('h2', 'innerHTML', 'temp'),
+      'byTitle,byDate,byRegister'.split(',').reduce((p, c) => (
+        p.appendChild(
+          DomRenderer.el('button', 'innerHTML', c,
+            '@fontWeight', this._sort === c ? 'bold' : 'normal',
+            'addEventListener', ['click', e => (this._sort = c, this.render())],
+          )
+        ), p
+      ), DomRenderer.el('nav')),
+      DomRenderer.el('section',
+        'appendChild', DomRenderer.el('input', 'type', 'text'),
+        'appendChild', DomRenderer.el('button', 'innerHTML', 'addTask',
+          'addEventListener', ['click', e => this.add(e.target.previousSibling.value)])
+      ),
+      ...data.children.map(({item, children}) =>
+        [
+          DomRenderer.el('h3', 'innerHTML', item.title,
+            '@textDecoration', item.isCompleted ? 'line-through' : 'none'),
+          DomRenderer.el('time', 'innerHTML', item.date, 'datetime', item.date),
+          DomRenderer.el('button', 'innerHTML', item.isCompleted ? 'progress' : 'complete',
+            'addEventListener', ['click', () => this.toggle(item)]
+          ),
+          DomRenderer.el('section',
+            'appendChild', DomRenderer.el('input', 'type', 'text'),
+            'appendChild', DomRenderer.el('button', 'innerHTML', 'addSubTask',
+              'addEventListener', ['click', e => this.addSubTask(item, e.target.previousSibling.value)])
+          ),
+          children.reduce(
+            (p, {item, children}) => (p.appendChild(DomRenderer.el('section', 'innetHTML', item.title)), p),
+            DomRenderer.el('section')
+          )
+       ].reduce((el, v) => (el.appendChild(v), el), DomRenderer.el('section'))
+      )
+    ].forEach(v => parent.appendChild(v))
+  }
+}
+const taskList = new TaskList('task list')
+const domRenderer = new DomRenderer(taskList, '#a')
+domRenderer.render()
+</script>
+</html>
