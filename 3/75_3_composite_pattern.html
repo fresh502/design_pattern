@@ -2,102 +2,157 @@
 <head>
 </head>
 <body>
+  <div id='todo'></div>
 </body>
 <script>
-const TaskItem = class {
-  constructor (title, date) {
+const sortRouter = {
+  title: (taskA, taskB) => taskA.title > taskB.title,
+  date: (taskA, taskB) => taskA.date > taskB.date
+}
+const Task = class {
+  constructor (title) {
     if (!title || typeof title !== 'string') throw new Error('Invalid title');
     this._title = title;
-    this._date = date;
-    this._isComplted = false;
     this._list = [];
   }
-  add (title, date = new Date()) {
-    this._list.push(new TaskItem(title, date))
+  get title () { return this._title; }
+  add (task) {
+    if (!task instanceof Task) throw new Error('Invalid taskItem');
+    this._list.push(task)
   }
-  remove (taskItem) {
-    if (!taskItem instanceof TaskItem) throw new Error('Invalid taskItem');
+  remove (task) {
+    if (!task instanceof Task) throw new Error('Invalid taskItem');
     const list = this._list;
-    if (list.includes(taskItem)) list.splice(list.indexOf(taskItem), 1);
+    if (list.includes(task)) list.splice(list.indexOf(task), 1);
   }
-  _getList (sort, stateGroup) {
+  getResult (sort, stateGroup = true) {
     const list = this._list;
-    const s = taskSortRouter[sort];
+    const s = sortRouter[sort];
     return {
-      task: this,
-      sub: stateGroup ? 
+      item: this._getResult(),
+      children:  (stateGroup ? 
         [
-          ...list.filter(task => !task.isCompleted).sort(s),
-          ...list.filter(task => task.isCompleted).sort(s)
-        ] : [...list].sort(s)
+          ...list.filter(task => !task.isCompleted()).sort(s),
+          ...list.filter(task => task.isCompleted()).sort(s)
+        ] : [...list].sort(s)).map(v => v.getResult(sort, stateGroup))
     }
   }
+  _getResult () { throw new Error('Must be overrided'); }
+  isCompleted () { throw new Error('Must be overrided'); }
+}
+const TaskItem = class extends Task {
+  constructor (title, date = new Date()) {
+    super(title);
+    this._date = date;
+    this._isCompleted = false;
+  }
+  _getResult () {
+    return this;
+  }
   toggle () {
-    this._isComplted = !this._isCompleted;
+    this._isCompleted = !this._isCompleted;
   }
-  sortTitle (taskItem) {
-    return this._title - taskItem.title;
-  }
-  sortDate (taskItem) {
-    return this._date - taskItem.date;
-  }
-  get title () {
-    return this._title;
-  }
-  get date () {
-    return this._date;
-  }
-  get isCompleted () {
+  isCompleted () {
     return this._isCompleted;
   }
+  get date () { return this._date; }
 }
-const taskSortRouter = {
-  title: (taskItemA, taskItemB) => taskItemA.sortTitle(taskItemB),
-  date: (taskItemA, taskItemB) => taskItemA.sortDate(taskItemB)
-}
-const TaskList = class {
+const TaskList = class extends Task {
   constructor (title) {
-    if (!title || typeof title !== 'string') throw new Error('Invalid title')
-    this._title = title;
-    this._list = [];
+    super(title);
   }
-  add (title, date = new Date()) {
-    this._list.push(new TaskItem(title, date))
+  _getResult () {
+    return this.title;
   }
-  remove (taskItem) {
-    if (!taskItem instanceof TaskItem) throw new Error('Invalid taskItem');
-    const list = this._list;
-    if (list.includes(taskItem)) list.splice(list.indexOf(taskItem), 1);
+  isCompleted () {}
+}
+const sel = (target) => {
+  return document.querySelector(target);
+}
+const el = (tag, ...attr) => {
+  const el = document.createElement(tag);
+  for (let i = 0; i < attr.length;) {
+    const k = attr[i++], v = attr[i++];
+    if (typeof el[k] === 'function') el[k](...(Array.isArray(v) ? v : [v]));
+    else if (k[0] === '@') el.style[k.substr(1)] = v;
+    else el[k] = v;
   }
-  byTitle (stateGroup = true) {
-    return this._getList('title', stateGroup);
+  return el
+}
+const DomRenderer = class {
+  constructor (list, base) {
+    this._base = base;
+    this._list = list;
+    this._sort = 'title'
   }
-  byDate(stateGroup = true) {
-    return this._getList('date', stateGroup);
+  add (parent, title, date) {
+    parent.add(new TaskItem(title, date));
+    this.render();
   }
-  _getList (sort, stateGroup) {
-    const list = this._list;
-    const s = taskSortRouter[sort];
-    const result = stateGroup ? 
-    [
-      ...list.filter(task => !task.isCompleted).sort(s),
-      ...list.filter(task => task.isCompleted).sort(s)
-    ] : [...list].sort(s);
-    return result.map(v => v._getList(sort, stateGroup));
+  remove (parent, task) {
+    parent.remove(task);
+    this.render();
+  }
+  toggle (task) {
+    if (task instanceof TaskItem) {
+      task.toggle();
+      this.render();
+    }
+  }
+  render () {
+    const base = this._base;
+    base.innerHTML = '';
+    base.appendChild('title,date'.split(',').reduce((nav, c) => {
+      nav.appendChild(
+        el('button', 'innerHTML', c,
+          '@fontWeight', this._sort === c ? 'bold' : 'normal',
+          'addEventListener', ['click', e => (this._sort = c, this.render())])
+      );
+      return nav;
+    }, el('nav')));
+    this._render(base, this._list, this._list.getResult(this._sort), 0);
+  }
+  _render (base, parent, {item, children}, depth) {
+    const temp = [];
+    base.style.paddingLeft = depth * 10 + 'px';
+    let p
+    if (!(item instanceof TaskItem)) {
+      p = parent
+      temp.push(el('h2', 'innerHTML', item));
+    } else {
+      p = item
+      temp.push(
+        el('h3', 'innerHTML', item.title,
+          '@textDecoration', item.isCompleted() ? 'line-through' : 'none'),
+        el('time', 'innerHTML', item.date.toISOString()),
+        el('button', 'innerHTML', item.isCompleted() ? 'progress' : 'complete',
+          'addEventListener', ['click', () => this.toggle(item)]),
+        el('button', 'innerHTML', 'remove',
+          'addEventListener', ['click', () => this.remove(parent, item)])
+      )
+    }
+    temp.push(
+      el('br'),
+      el('input', 'type', 'text'),
+      el('button', 'innerHTML', 'addTask',
+        'addEventListener', ['click', e => this.add(p, e.target.previousSibling.value)])
+    )
+    const sub = el('section')
+    temp.push(sub);
+    temp.forEach(v => base.appendChild(v));
+    children.forEach(v => { this._render(sub, p, v, depth + 1)});
   }
 }
-const list1 = new TaskList('Codespitz todo');
-list1.add('3강 복습');
-list1.add('3강 과제 제출');
-
-const list2 = new TaskList('Design pattern todo');
-list2.add('read composite pattern');
-list2.add('write composite pattern');
-
-const list  = list2.byDate();
-list[1].task.add('write task interface');
-list[1].task.add('write renderer');
-
-console.log(list2.byDate());
+const list1 = new TaskList('s75');
+const item1 = new TaskItem('3강 복습');
+const item2 = new TaskItem('3강 과제');
+list1.add(item1);
+list1.add(item2);
+const sub1 = new TaskItem('동영상 시청');
+item1.add(sub1);
+const subsub1 = new TaskItem('컴포지트 패턴 이해');
+sub1.add(subsub1);
+const todo = new DomRenderer(list1, sel('#todo'));
+todo.render();
 </script>
 </html>
