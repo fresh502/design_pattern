@@ -13,38 +13,45 @@
 const el = v => document.querySelector(v);
 const baseUrl = Symbol.for('baseUrl of router');
 
-const Repo = class {
-  set base (base) { this._base = base; }
+const Repo = class extends Map {
+  constructor (id, repo) {
+    if (typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument');
+    super();
+    this._base = `https://api.github.com/repos/${id}/${repo}/contents/`;
+  }
   get base () { return this._base; }
-  set router (router) { this._router = router; }
-  get router () { return this._router; }
+  add (ext, loader) {
+    if (typeof ext !== 'string') throw new Error('Invalid ext');
+    if (!loader instanceof Loader) throw new Error('Invalid loader');
+    ext.split(',').forEach(v => this.set(v, loader));
+  }
+  load (path) {
+    if (typeof path !== 'string') throw new Error('Invalid path');
+    const ext = path.split('.').pop();
+    if (!this.has(ext)) throw new Error('Not supported ext');
+    return this.get(ext);
+  }
 }
 const Github = class {
   constructor () {
     this._repoMap = new Map();
   }
   addRepo (key, id, repo) {
-    if (typeof key !== 'string' || typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument');
-    const repository = new Repo();
-    repository.base = `https://api.github.com/repos/${id}/${repo}/contents/`;
-    repository.router = new Map();
-    this._repoMap.set(key, repository)
+    if (typeof key !== 'string') throw new Error('Invalid key');
+    this._repoMap.set(key, new Repo(id, repo));
   }
-  addRouter (key, ext, o) {
-    if (!this._repoMap.has(key)) throw new Error('Not added repo');
-    if (typeof ext !== 'string') throw new Error('Invalid ext');
-    if (!o instanceof Loader) throw new Error('Invalid loader');
-
-    const router = this._repoMap.get(key).router;
-    ext.split(',').forEach(v => router.set(v, o));
+  addRouter (key, ext, loader) {
+    const repoMap = this._repoMap;
+    if (!repoMap.has(key)) throw new Error('Not added repo');
+    const repo = repoMap.get(key);
+    repo.add(ext, loader)
   }
   load (key, path, el) {
-    if (!this._repoMap.has(key)) throw new Error('Not supported repo');
-    if (typeof path !== 'string') throw new Error('Invalid path');
-    const ext = path.split('.').pop();
-    const {base, router} = this._repoMap.get(key);
-    if (!router.has(ext)) throw new Error('Not supported ext');
-    const parser = router.get(ext);
+    const repoMap = this._repoMap;
+    if (!repoMap.has(key)) throw new Error('Not supported repo');;
+    const repo = repoMap.get(key);
+    const base = repo.base;
+    const parser = repo.load(path);
      
     const id = `callback${Github._id++}`;
     const s = document.createElement('script');
