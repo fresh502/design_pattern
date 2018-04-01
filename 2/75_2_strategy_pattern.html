@@ -12,51 +12,53 @@
 <script>
 const el = v => document.querySelector(v);
 const baseUrl = Symbol.for('baseUrl of router');
-const Service = class {
-  constructor () {
-    this._repoMap = new Map;
-  }
+
+const Repo = class {
+  set base (base) { this._base = base; }
+  get base () { return this._base; }
+  set router (router) { this._router = router; }
+  get router () { return this._router; }
 }
-const GithubService = class extends Service {
+const Github = class {
   constructor () {
-    super();
+    this._repoMap = new Map();
   }
   addRepo (key, id, repo) {
     if (typeof key !== 'string' || typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument');
-    const router = new Map;
-    router.base = `https://api.github.com/repos/${id}/${repo}/contents/`;
-    this._repoMap.set(key, router)
+    const repository = new Repo();
+    repository.base = `https://api.github.com/repos/${id}/${repo}/contents/`;
+    repository.router = new Map();
+    this._repoMap.set(key, repository)
   }
   addRouter (key, ext, o) {
     if (!this._repoMap.has(key)) throw new Error('Not added repo');
     if (typeof ext !== 'string') throw new Error('Invalid ext');
     if (!o instanceof Loader) throw new Error('Invalid loader');
 
-    const router = this._repoMap.get(key);
+    const router = this._repoMap.get(key).router;
     ext.split(',').forEach(v => router.set(v, o));
   }
   load (key, path, el) {
     if (!this._repoMap.has(key)) throw new Error('Not supported repo');
     if (typeof path !== 'string') throw new Error('Invalid path');
-    const router = this._repoMap.get(key);
-    const {base} = router
+    const ext = path.split('.').pop();
+    const {base, router} = this._repoMap.get(key);
+    if (!router.has(ext)) throw new Error('Not supported ext');
+    const parser = router.get(ext);
      
-    const id = `callback${GithubService._id++}`;
+    const id = `callback${Github._id++}`;
     const s = document.createElement('script');
-    s.src = `${base}${path}?callback=GithubService.${id}`;
+    s.src = `${base}${path}?callback=Github.${id}`;
     document.head.appendChild(s);
 
-    GithubService[id] = ({data: {content}}) => {
-      delete GithubService[id];
+    Github[id] = ({data: {content}}) => {
+      delete Github[id];
       document.head.removeChild(s);
-      const ext = path.split('.').pop();
-      const parser = router.get(ext);
-      if (!parser) throw new Error('Not supported extention');
       parser.load(el, content);
     }
   }
 }
-GithubService._id = 0
+Github._id = 0
 
 const Loader = class {
   load (el, content) { throw new Error('Must be overrided'); }
@@ -85,38 +87,22 @@ const MDLoader = class extends Loader {
   }
 }
 
-const Builder = class {
-  constructor () {
-    
-  }
-  getService () {
-    throw new Error('Must be overrided');
-  }
-}
-const GithubServiceBuilder = class extends Builder {
-  constructor (key, id, repo) {
-    super();
-    const strategyForExt = [
-      {'jpg,png,gif': new ImageLoader},
-      {'md': new MDLoader}
-    ]
-    const githubService = new GithubService();
-    githubService.addRepo(key, id, repo);
-    strategyForExt.forEach(obj => Object.entries(obj).forEach(([ext, strategy]) => githubService.addRouter(key, ext, strategy)));
-    this._githubService = githubService;
-  }
-  getService () {
-    return this._githubService;
-  }
-}
+const github = new Github();
+const img = new ImageLoader();
+const md = new MDLoader();
 
-const githubServiceBuilder = new GithubServiceBuilder('sinrok', 'fresh502', 'design_pattern');
-const github = githubServiceBuilder.getService();
+github.addRepo('sinrok', 'fresh502', 'design_pattern')
+github.addRouter('sinrok', 'jpg,png,gif', img);
+github.addRouter('sinrok', 'md', md)
+
+github.addRepo('s75', 'hikaMaeng', 'codespitz75');
+github.addRouter('s75', 'jpg,png,gif', img);
+github.addRouter('s75', 'md', md);
 
 github.load('sinrok', 'husky.png', el('#a'));
 github.load('sinrok', 'README.md', el('#b'));
-// github.load('s75', 'einBig.png', el('#c'));
-// github.load('s75', 'README.md', el('#d'));
+github.load('s75', 'einBig.png', el('#c'));
+github.load('s75', 'README.md', el('#d'));
 </script>
 </body>
 </html>
