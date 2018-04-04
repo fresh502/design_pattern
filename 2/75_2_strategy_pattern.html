@@ -11,8 +11,39 @@
   <div id="d"></div>
 <script>
 const el = v => document.querySelector(v);
-const baseUrl = Symbol.for('baseUrl of router');
+</script>
+<script>
+const jsonp = (path, obj) => {
+  if (!(obj instanceof Jsonplistenner)) throw new Error('Invalid Jsonplistenner');
+  const id = `callback${jsonp._id++}`;
+  const s = document.createElement('script');
+  s.src = `${path}?callback=jsonp.${id}`;
+  document.head.appendChild(s);
 
+  jsonp[id] = (content) => {
+    delete jsonp[id];
+    document.head.removeChild(s);
+    obj.triggerLoading(content);
+  }
+}
+jsonp._id = 0
+
+const JsonpListenner = class {
+  triggerLoading (content) { throw new Error('Must be overrided'); }  
+}
+const GithubLoader = class extends JsonpListenner {
+  constructor (parser, el) {
+    super();
+    if (!(parser instanceof Parser)) throw new Error('Invalid Parser');
+    this._parser = parser;
+    this._el = el
+  }
+  triggerLoading ({data: {content}}) {
+    this._parser.parse(this._el, content);
+  }
+}
+</script>
+<script>
 const Repo = class extends Map {
   constructor (id, repo) {
     if (typeof id !== 'string' || typeof repo !== 'string') throw new Error('Invalid argument');
@@ -22,10 +53,10 @@ const Repo = class extends Map {
   get base () { return this._base; }
   add (ext, loader) {
     if (typeof ext !== 'string') throw new Error('Invalid ext');
-    if (!loader instanceof Loader) throw new Error('Invalid loader');
+    if (!loader instanceof Parser) throw new Error('Invalid loader');
     ext.split(',').forEach(v => this.set(v, loader));
   }
-  load (path) {
+  getParser (path) {
     if (typeof path !== 'string') throw new Error('Invalid path');
     const ext = path.split('.').pop();
     if (!this.has(ext)) throw new Error('Not supported ext');
@@ -51,33 +82,22 @@ const Github = class {
     if (!repoMap.has(key)) throw new Error('Not supported repo');;
     const repo = repoMap.get(key);
     const base = repo.base;
-    const parser = repo.load(path);
-     
-    const id = `callback${Github._id++}`;
-    const s = document.createElement('script');
-    s.src = `${base}${path}?callback=Github.${id}`;
-    document.head.appendChild(s);
-
-    Github[id] = ({data: {content}}) => {
-      delete Github[id];
-      document.head.removeChild(s);
-      parser.load(el, content);
-    }
+    const parser = repo.getParser(path)
+    jsonp(`${base}${path}`, new GithubLoader(parser, el));
   }
 }
-Github._id = 0
 
-const Loader = class {
-  load (el, content) { throw new Error('Must be overrided'); }
+const Parser = class {
+  parse (el, content) { throw new Error('Must be overrided'); }
 }
 
-const ImageLoader = class extends Loader {
-  load (el, content) {
+const ImageParser = class extends Parser {
+  parse (el, content) {
     el.src = `data:text/plain;base64,${content}`;
   }
 }
-const MDLoader = class extends Loader {
-  load (el, content) {
+const MDParser = class extends Parser {
+  parse (el, content) {
     const d64 = v => decodeURIComponent(atob(v).split('').map(c => '%' + ('00' +c.charCodeAt(0).toString(16)).slice(-2)).join(''));
     const parseMD = v => {
       return d64(v)
@@ -95,8 +115,8 @@ const MDLoader = class extends Loader {
 }
 
 const github = new Github();
-const img = new ImageLoader();
-const md = new MDLoader();
+const img = new ImageParser();
+const md = new MDParser();
 
 github.addRepo('sinrok', 'fresh502', 'design_pattern')
 github.addRouter('sinrok', 'jpg,png,gif', img);
